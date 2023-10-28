@@ -174,3 +174,28 @@ def show_category(id):
     res = requests.get(api_url)
     res = res.json()
     return res
+
+def get_latest_posts(topic_id, count=10):
+    api_url = discourse_url + f"/t/-/{topic_id}.json"
+    res = requests.get(api_url)
+    res = res.json()
+    post_ids_list_in_a_topic = list(res['post_stream']['stream'])
+    
+    recent_posts = []
+    for post_id in reversed(post_ids_list_in_a_topic):  # 最新の投稿から順次処理
+        post_detail = get_a_post(post_id)
+        if not post_detail.get('user_deleted', False):  # user_deletedがfalseの場合
+            recent_posts.append(post_detail)
+        
+        if len(recent_posts) == count:  # countに到達したら終了
+            break
+
+    recent_posts.reverse()
+    return recent_posts
+
+def format_posts(posts):
+    formatted_strings = []
+    for idx, post in enumerate(posts, start=1):
+        formatted_strings.append(f"----\n{post['raw']}\n")
+    return "\n".join(formatted_strings)
+
