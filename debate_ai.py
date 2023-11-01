@@ -175,7 +175,7 @@ while execution_count < max_execution_count:
             model=model,
             messages=[
                 {"role": "system", "content": system_prompt},
-                {"role": "user", "content": latest_posts_formatted},
+                {"role": "user", "content": user_content},
             ],
             temperature=1,
         )
