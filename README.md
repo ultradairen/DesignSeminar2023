@@ -38,3 +38,62 @@ sequenceDiagram
 - `DISCOURSE_URL`, `DISCOURSE_API_KEY`, `DISCOURSE_API_USERNAME`: Discourseの設定情報
 - `OPENAI_API_KEY`, `OPENAI_MODEL`: OpenAIのAPIキーと使用するモデル名
 
+# Colabでの操作方法
+※もっと良いやり方あるかもしれないけどおそらくこんな感じ
+
+## Githubレポジトリをダウンロード
+慣れている方はCloneすればOK。
+
+- https://github.com/ultradairen/DesignSeminar2023
+- `Code` - `Download ZIP`
+- どこかに解凍しておく
+
+## .envファイル準備
+.env.exampleを元に、.envファイルを作成
+
+| 名前 | 説明 |
+| -- | -- |
+| MAX_EXECUTION_COUNT | 何回繰り返し実行するか設定します |
+| INTERVAL_SEC_MIN | 最小実行間隔（秒）を設定します |
+| INTERVAL_SEC_MAX | 最大実行間隔（秒）を設定します |
+| DISCOURSE_URL | DiscourseのURLを設定します |
+| DISCOURSE_API_KEY | DiscourseのAPIキーを設定します |
+| DISCOURSE_API_USERNAME | DiscourseのAPIユーザー名を設定します |
+| DISCOURSE_LATEST_POSTS_COUNT | 取得する直近投稿数を設定します。多くするとChatGPT処理に失敗する場合があります。|
+| DISCOURSE_CATEGORY_ID | DiscourseのカテゴリIDを設定します |
+| DISCOURSE_TOPIC_ID | DiscourseのトピックIDを設定します |
+| OPENAI_API_KEY | OpenAIのAPIキーを設定します |
+| OPENAI_MODEL | 	使用するOpenAIのモデルを設定します |
+
+## debate_ai.ipynbをColabで開く
+- https://colab.research.google.com
+- `ファイル` - `ノートブックを開く`
+- `GitHub`
+    -  GitHub URL
+      - https://github.com/ultradairen/DesignSeminar2023
+    - パス
+      - `debate_ai.ipynb`をクリック
+
+## 必要ファイルのアップロード
+- 左ペイン - `ファイル`クリック
+- `セッションストレージにアップロード`クリック
+- 以下3ファイルをアップロード
+  - .env
+  - requirements.txt
+  - simpledcapi.py
+
+## ペルソナ選択＆味付け
+以下を変更する。`additional_instruction`はsystem promptで渡しているが、あまり影響しないかも。
+
+```python
+agent_name = "クマ - ブロンコ"
+additional_instruction = """
+冬眠の時期が近づいてきたので、ちょっと眠いことや、冬眠に関する意見を必ず述べてください。
+"""
+```
+
+## 実行
+上から順繰りに実行
+
+## .envを変更したとき
+実行回数など.envに変更を加えた場合、再アップロードとともにランタイムの再起動が必要。`ランタイム` - `ランタイムを再起動`から可能。
