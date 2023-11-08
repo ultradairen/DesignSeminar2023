@@ -25,7 +25,7 @@
 
 import pprint, time, os
 import simpledcapi
-import openai
+from openai import OpenAI
 
 import logging
 import re
@@ -87,8 +87,9 @@ category_id = os.getenv('DISCOURSE_CATEGORY_ID')
 topic_id = os.getenv('DISCOURSE_TOPIC_ID')
 
 # OpenAI
-openai.api_key = os.getenv('OPENAI_API_KEY')
+api_key = os.getenv('OPENAI_API_KEY')
 model = os.getenv('OPENAI_MODEL')
+client = OpenAI(api_key=api_key)
 
 # System Prompt
 system_prompt = f"""
@@ -171,7 +172,7 @@ while execution_count < max_execution_count:
         {latest_posts_formatted}
         """
 
-        res = openai.ChatCompletion.create(
+        res = client.chat.completions.create(
             model=model,
             messages=[
                 {"role": "system", "content": system_prompt},
@@ -182,7 +183,7 @@ while execution_count < max_execution_count:
 
         logging.info(f"Done. Response:\n{res}")
 
-        message = res["choices"][0]["message"]["content"]
+        message = res.choices[0].message.content
 
         # Discourseへ投稿
         if len(message) > 0:
