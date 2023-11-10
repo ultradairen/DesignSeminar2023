@@ -64,6 +64,7 @@ sequenceDiagram
 | DISCOURSE_TOPIC_ID | DiscourseのトピックIDを設定します |
 | OPENAI_API_KEY | OpenAIのAPIキーを設定します |
 | OPENAI_MODEL | 	使用するOpenAIのモデルを設定します |
+| SERPER_API_KEY | serper.devのAPIキーを設定します。孫悟空を使用する時のみ必要になります。|
 
 ## debate_ai.ipynbをColabで開く
 - https://colab.research.google.com
@@ -97,3 +98,55 @@ additional_instruction = """
 
 ## .envを変更したとき
 実行回数など.envに変更を加えた場合、再アップロードとともにランタイムの再起動が必要。`ランタイム` - `ランタイムを再起動`から可能。
+
+# 孫悟空 (web_researcher_ai.py)
+本コードはこのスクリプトは、特定のディスカッショントピックに関連する情報をインターネットから検索し、それを元にして孫悟空のキャラクターとして回答を生成することを目的としています。
+
+## 概要図
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant S as Script (web_researcher_ai.py)
+    participant D as Discourse API
+    participant G as Google Serper API
+    participant O as OpenAI
+
+    U->>S: Execute Script
+    S->>D: Retrieve latest posts from Discourse
+    D-->>S: Latest posts data
+    S->>S: Format latest posts
+    S->>O: Generate query using formatted posts
+    O-->>S: Generated query
+    S->>G: Search query on Google
+    G-->>S: Search results
+    S->>S: Format search results into response
+    S->>D: Post response to Discourse
+    D-->>S: Confirmation of post
+    S-->>U: Script execution complete
+```
+
+## 必要な依存関係のインストール
+
+このスクリプトを実行する前に、まず`requirements.txt`を使用して必要なライブラリをインストールします。このステップではプロジェクト全体に必要な依存関係がインストールされます。
+
+```bash
+pip install -r requirements.txt
+```
+
+その後、このスクリプト固有の依存関係として、現時点でLangChain（バージョン0.0.334）が対応していないOpenAIのバージョン1系に合わせて、`openai`ライブラリの特定のバージョンをインストールする必要があります。以下のコマンドを実行して、適切なバージョンの`openai`をインストールしてください。
+
+```bash
+pip install -U openai==0.28.1
+```
+
+この手順により、スクリプトが正しく動作するための環境が整えられます。
+
+## .envファイル準備
+前述のドキュメントを参照してください。
+
+## 実行
+スクリプトは以下コマンドを実行するだけで稼働します。コマンドを実行すると、スクリプトは設定された間隔でDiscourseの最新の投稿を検索し、それに基づいて回答を生成します。
+
+```bash
+python web_researcher_ai.py
+```
