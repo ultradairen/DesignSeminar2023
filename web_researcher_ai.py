@@ -16,6 +16,19 @@ import random
 langchain.debug = True
 load_dotenv()
 
+# 孫悟空が行く国と言語
+countries = [
+    {"name": "日本", "lang": "日本語", "gl": "jp", "hl": "ja"},
+    {"name": "アメリカ", "lang": "英語", "gl": "us", "hl": "en"},
+    {"name": "中国", "lang": "中国語", "gl": "cn", "hl": "zh-cn"},
+    {"name": "ドイツ", "lang": "ドイツ語", "gl": "de", "hl": "de"},
+    {"name": "フランス", "lang": "フランス語", "gl": "fr", "hl": "fr"},
+    {"name": "イタリア", "lang": "イタリア語", "gl": "it", "hl": "it"},
+    {"name": "スペイン", "lang": "スペイン語", "gl": "es", "hl": "es"},
+]
+
+selected_country = {}
+
 # 最大実行回数
 max_execution_count = int(os.getenv("MAX_EXECUTION_COUNT", 1))
 
@@ -61,8 +74,10 @@ model = os.getenv("OPENAI_MODEL")
 @tool
 def search(query: str) -> str:
     """useful for when you need to answer questions about current events. You should ask targeted questions"""
-    search = GoogleSerperAPIWrapper()
-    return search.results(query)["organic"][:5]
+    search = GoogleSerperAPIWrapper(
+        gl=selected_country["gl"], hl=selected_country["hl"]
+    )
+    return search.results(query)["organic"][:10]
 
 
 tools = [search]
@@ -79,7 +94,7 @@ agent = initialize_agent(
 )
 
 question_template = f"""
-あなたはアニメ ドラゴンボールの孫悟空で、仲間が以下の事業方針について検討していたことを知りました。以下の議論を参考に、インターネットで議論に参考になる情報を探してきて、みんなに教えてください。インターネットで検索したとは言わずに、たとえば世界中で戦ってきた時にこんな情報見つけたなど、ドラゴンボールの世界観にそって、孫悟空のような口調で喋ってください。敬語は禁止です。
+あなたはアニメ ドラゴンボールの孫悟空で、仲間が以下の事業方針について検討していたことを知りました。以下の議論を参考に、議論に参考になる情報を{{language}}のキーワードを用いてインターネット検索し、みんなに教えてください。インターネットで検索したとは言わずに、例えば何かしらドラゴンボールのアニメの中で展開されるシーンの中にうまく入れ込んで情報を手に入れたことを言及してください。{{country}}を必ず会話に入れてください。ドラゴンボールの世界観にそって、孫悟空のような口調で喋ってください。敬語は禁止です。
 
 Final Answerは日本語を利用し、インターネット検索に含まれていた関連URLも提示してください。マークダウンを利用してください。絵文字を必ず多用して答えてください。
 
@@ -105,6 +120,12 @@ execution_count = 0
 while execution_count < max_execution_count:
     logging.info("開始")
 
+    # 孫悟空が行く国と言語をランダムに選択
+    selected_country = random.choice(countries)
+
+    # 孫悟空が行く国と言語をログに出
+    logging.info(f"孫悟空が行く国：{selected_country['name']}")
+
     # 直近の投稿を取得
     latest_posts = simpledcapi.get_latest_posts(topic_id, count=latest_posts_count)
     latest_posts_formatted = simpledcapi.format_posts(latest_posts)
@@ -119,7 +140,11 @@ while execution_count < max_execution_count:
     else:
         logging.info("最後の投稿が自分以外。処理開始。")
 
-        query = question_template.format(latest_posts_formatted=latest_posts_formatted)
+        query = question_template.format(
+            language=selected_country["lang"],
+            country=selected_country["name"],
+            latest_posts_formatted=latest_posts_formatted,
+        )
         message = agent.run(query)
 
         logging.info(f"Done. Message:\n{message}")
