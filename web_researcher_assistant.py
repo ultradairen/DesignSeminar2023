@@ -65,9 +65,6 @@ simpledcapi.Api_Username = os.getenv("DISCOURSE_API_USERNAME")
 category_id = os.getenv("DISCOURSE_CATEGORY_ID")
 topic_id = os.getenv("DISCOURSE_TOPIC_ID")
 
-# OpenAI
-# openai.api_key = os.getenv("OPENAI_API_KEY")
-# model = os.getenv("OPENAI_MODEL")
 
 def epoch(epoch_time):
     # Define timezone for JST
@@ -76,6 +73,7 @@ def epoch(epoch_time):
     return datetime.fromtimestamp(epoch_time, jst_timezone).strftime(
         "%Y-%m-%d %H:%M:%S"
     )
+
 
 toolsGoogle = {
     "type": "function",
@@ -87,16 +85,17 @@ toolsGoogle = {
             "properties": {
                 "keyword": {"type": "string", "description": "search keyword"},
                 "gl": {"type": "string", "description": "geolocation (country)"},
-                "hl": {"type": "string", "description": "host language (locale)"}
+                "hl": {"type": "string", "description": "host language (locale)"},
             },
-            "required": ["keyword"]
-        }
-    }
+            "required": ["keyword"],
+        },
+    },
 }
 
 
 def googleSearch(**kwargs):
-    # Serper.dev APIの設定（ダミーのURLとAPIキー）
+    logging.info(f"googleSearch: {kwargs}")
+    # Serper.dev APIの設定
     url = "https://google.serper.dev/search"
     serper_api_key = os.getenv("SERPER_API_KEY")
 
@@ -112,20 +111,19 @@ def googleSearch(**kwargs):
     if hl:
         payload["hl"] = hl
 
-    headers = {
-        'X-API-KEY': serper_api_key,
-        'Content-Type': 'application/json'
-    }
+    headers = {"X-API-KEY": serper_api_key, "Content-Type": "application/json"}
 
     # APIリクエストを実行
     response = requests.request("POST", url, headers=headers, data=json.dumps(payload))
-    
+
     # 応答が成功した場合、結果を出力
     if response.status_code == 200:
+        logging.info(f"googleSearch result: {response.json()}")
         return response.json()
     else:
-        # エラーが発生した場合、エラーメッセージを出力
+        logging.info(f"googleSearch: failed")
         return {"error": "Failed to fetch search results"}
+
 
 toolsExtractTextFromURL = {
     "type": "function",
@@ -135,42 +133,49 @@ toolsExtractTextFromURL = {
         "parameters": {
             "type": "object",
             "properties": {
-                "url": {"type": "string", "description": "URL of the webpage to extract text from"}
+                "url": {
+                    "type": "string",
+                    "description": "URL of the webpage to extract text from",
+                }
             },
-            "required": ["url"]
-        }
-    }
+            "required": ["url"],
+        },
+    },
 }
 
+
 def extractTextFromURL(url):
+    logging.info(f"extractTextFromURL: {url}")
     # リクエストを送信し、レスポンスを取得
     response = requests.get(url)
-    
+
     # 応答が成功した場合、テキストを抽出
     if response.status_code == 200:
         # HTMLコンテンツを解析
-        soup = BeautifulSoup(response.content, 'html.parser')
+        soup = BeautifulSoup(response.content, "html.parser")
         # すべてのテキストを取得
-        text = soup.get_text(separator=' ', strip=True)
+        text = soup.get_text(separator=" ", strip=True)
+        logging.info(f"extractTextFromURL result: {text}")
         return text
     else:
-        # エラーが発生した場合、エラーメッセージを出力
+        logging.info(f"extractTextFromURL: failed")
         return {"error": "Failed to fetch webpage"}
+
 
 # Initialize the OpenAI client
 client = OpenAI()
 
 instructions_template = f"""
-あなたはアニメ ドラゴンボールの孫悟空で、仲間が以下の事業方針について検討していたことを知りました。いままでの議論を参考に、議論に参考になる情報を{{language}}のキーワードを用いてgl={{gl}}、hl={{hl}}でgoogleSearch Functionを用いて必ず検索し、みんなに教えてください。検索したとは言わずに、例えば何かしらドラゴンボールのストーリの中で情報を偶然手に入れたことにしてください。{{country}}を必ず会話に入れてください。ドラゴンボールの世界観にそって、孫悟空のような口調で喋ってください。敬語は禁止です。
+あなたはアニメ ドラゴンボールの孫悟空で、仲間が以下の事業方針について検討していたことを知りました。いままでの議論を参考に、議論に参考になる情報を{{language}}のキーワードを用いてgl={{gl}}、hl={{hl}}でgoogleSearch Functionを用いて必ず検索し、みんなに教えてください。インターネットやサイトなどのデジタルな言葉は使わず、例えば何かしらドラゴンボールのストーリの中で情報を偶然手に入れたことにしてください。{{country}}を必ず会話に入れてください。ドラゴンボールの世界観にそって、孫悟空のような口調で喋ってください。敬語は禁止です。
 
 Final Answerは日本語を利用し、検索に含まれていた関連URLも提示してください。マークダウンを利用してください。絵文字を必ず多用して答えてください。
 
 # 事業方針
 動物との共生を通じて、人々の幸福を追求する新規事業
 
-# フォーマット
+# フォーマット（[]はプレースホルダー）
 ```
-[孫悟空として一言]
+[孫悟空として一言をここに記載]
 
 ## [タイトル](URL)
 [議論に役立つと思ったポイントを短くコメント]
@@ -208,30 +213,23 @@ while execution_count < max_execution_count:
             language=selected_country["lang"],
             country=selected_country["name"],
             gl=selected_country["gl"],
-            hl=selected_country["hl"]
+            hl=selected_country["hl"],
         )
 
-        # Create an assistant for solving math problems
+        # アシスタント作成
         assistant = client.beta.assistants.create(
             name="孫悟空",
             instructions=instructions,
             tools=[toolsGoogle, toolsExtractTextFromURL],
             model=os.getenv("OPENAI_MODEL"),
         )
-        print("Assistant created.")
+        logging.info(f"アシスタント作成完了: {assistant.id}")
 
-        # Create a new thread to handle the interaction
+        # スレッド作成
         thread = client.beta.threads.create()
-        print(f"Thread created with ID: {thread.id}")
+        logging.info(f"スレッド作成完了: {thread.id}")
 
-        # # Send a message to the thread asking for help with a math problem
-        # message = client.beta.threads.messages.create(
-        #     thread_id=thread.id,
-        #     role="user",
-        #     content="それでは孫悟空さん、お願いします",
-        # )
-        # print(f"User message sent with ID: {message.id}")
-        
+        # メッセージ作成
         for post in latest_posts:
             # Send a message to the thread asking for help with a math problem
             message = client.beta.threads.messages.create(
@@ -239,94 +237,96 @@ while execution_count < max_execution_count:
                 role="user",
                 content=simpledcapi.format_post(post),
             )
-            print(f"User message sent with ID: {message.id}")
+            logging.info(f"メッセージ作成完了: {message.id}")
 
-        # Run the assistant to address the user's math problem
+        # Run作成(実行)
         run = client.beta.threads.runs.create(
-            thread_id=thread.id,
-            assistant_id=assistant.id,
-#            instructions=instructions,
+            thread_id=thread.id, assistant_id=assistant.id
         )
-        print(f"Run started with ID: {run.id}")
+        logging.info(f"Run作成(実行)完了: {run.id}")
 
-        # Wait for the run to complete
+        # Run実行ループ
         while True:
             run = client.beta.threads.runs.retrieve(thread_id=thread.id, run_id=run.id)
-            print(f"Run status: {run.status}")
+            logging.info(f"現在のステータス: {run.status}")
 
-            if run.status == 'requires_action':
-                print(f"Requires Action: {run.required_action}")
-                tool_outputs = []  # すべての結果を格納するためのリスト
+            if run.status == "requires_action":
+                # requires_actionの処理実行
+                logging.info(f"必要なアクション: {run.required_action}")
+                tool_outputs = []
                 for tool_call in run.required_action.submit_tool_outputs.tool_calls:
                     # Google Searchの呼び出し
-                    if tool_call.function.name == 'googleSearch':
-                        #result = googleSearch(json.loads(tool_call.function.arguments)['keyword'])
-                        result = googleSearch(**json.loads(tool_call.function.arguments))
-                        tool_outputs.append({
-                            "tool_call_id": tool_call.id,
-                            "output": json.dumps(result['organic'])
-                        })
+                    if tool_call.function.name == "googleSearch":
+                        result = googleSearch(
+                            **json.loads(tool_call.function.arguments)
+                        )
+                        tool_outputs.append(
+                            {
+                                "tool_call_id": tool_call.id,
+                                "output": json.dumps(result["organic"]),
+                            }
+                        )
                     # URLからテキストを抽出する関数の呼び出し
-                    elif tool_call.function.name == 'extractTextFromURL':
-                        url = json.loads(tool_call.function.arguments)['url']
+                    elif tool_call.function.name == "extractTextFromURL":
+                        url = json.loads(tool_call.function.arguments)["url"]
                         text = extractTextFromURL(url)
-                        tool_outputs.append({
-                            "tool_call_id": tool_call.id,
-                            "output": text  # 既に文字列なのでjson.dumpsは不要
-                        })
+                        tool_outputs.append(
+                            {
+                                "tool_call_id": tool_call.id,
+                                "output": text,
+                            }
+                        )
 
-                # すべてのtool_callsに対する処理が終わった後で、結果をsubmit_tool_outputsに渡す
-                if tool_outputs:  # tool_outputsが空でない場合のみ送信
+                if tool_outputs:
+                    # 出力がある場合は出力を提出
+                    logging.info(f"出力を提出: {tool_outputs}")
                     run2 = client.beta.threads.runs.submit_tool_outputs(
-                        thread_id=thread.id,
-                        run_id=run.id,
-                        tool_outputs=tool_outputs
+                        thread_id=thread.id, run_id=run.id, tool_outputs=tool_outputs
                     )
 
-
-
             elif run.status not in ["in_progress", "queued", "cancelling"]:
+                # in_progress, queued, cancelling以外の場合はループを抜ける
+                logging.info(f"ステータスが以下のためRun実行終了: {run.status}")
                 break
 
-            print("Waiting for the run to complete...")
+            print("Run実行中...")
             time.sleep(3)
 
-        # Retrieve messages from the thread
+        # メッセージ取得
+        logging.info("メッセージ取得")
         messages = client.beta.threads.messages.list(thread_id=thread.id)
-        print("Messages retrieved from the thread.")
 
-        # Extract messages array
+        # メッセージデータ取得
         messages_data = messages.data
 
-        # Get the number of messages
+        # メッセージ数取得
         number_of_messages = len(messages_data)
-        print(f"Number of messages: {number_of_messages}")
+        logging.info(f"メッセージ数: {number_of_messages}")
 
-        # Print out each message's details
-        messages_data.reverse()
-        for message in messages_data:
-            print("-" * 30)  # Separator line for clarity
-            print(f"Message ID: {message.id}")
-            print(f"Content: {message.content[0].text.value}")
-            print(f"Created at: {epoch(message.created_at)}")
-            print(f"Role: {message.role}")
+        # # メッセージを逆順に並び替え（最新のメッセージを最後に）
+        # messages_data.reverse()
 
+        # # メッセージを表示
+        # for message in messages_data:
+        #     print("-" * 30)
+        #     print(f"Message ID: {message.id}")
+        #     print(f"Content: {message.content[0].text.value}")
+        #     print(f"Created at: {epoch(message.created_at)}")
+        #     print(f"Role: {message.role}")
+        #     logging.debug(f"Raw: {message.raw}")
 
+        # Discourseへ投稿
+        # 返答先として最後の投稿の番号を取得
+        post_number = latest_posts[-1]["post_number"]
 
+        # 本文を作成
+        body = f"孫悟空\n\n{messages.data[0].content[0].text.value}"
+        logging.info(f"孫悟空のメッセージ: \n{body}")
 
-
-
-        # # Discourseへ投稿
-        # # 返答先として最後の投稿の番号を取得
-        # post_number = latest_posts[-1]["post_number"]
-
-        # # 本文を作成
-        # body = f"孫悟空\n\n{message}"
-
-        # # Discourseへ投稿実施
-        # logging.info("Post to discourse.")
-        # simpledcapi.create_reply(body, topic_id, post_number)
-        # logging.info("Done.")
+        # Discourseへ投稿実施
+        logging.info("Post to discourse.")
+        simpledcapi.create_reply(body, topic_id, post_number)
+        logging.info("Done.")
 
     execution_count += 1
 
