@@ -1,4 +1,3 @@
-# TODO: とりあえず動いた。でもdiscourseの内容はmessageで小分けして渡す方が良いかもというか、AssistantAPI使った甲斐があると言うか。
 import os, time
 from dotenv import load_dotenv
 
@@ -53,7 +52,7 @@ class UnicodeEscapeDecodeFormatter(logging.Formatter):
         )
 
 
-logging.basicConfig(level=logging.DEBUG, handlers=[logging.StreamHandler()])
+logging.basicConfig(level=logging.INFO, handlers=[logging.StreamHandler()])
 handler = logging.getLogger().handlers[0]
 handler.setFormatter(UnicodeEscapeDecodeFormatter("%(levelname)s:%(name)s:%(message)s"))
 
@@ -86,31 +85,40 @@ toolsGoogle = {
         "parameters": {
             "type": "object",
             "properties": {
-                "keyword": {"type": "string", "description": "search keyword"}
+                "keyword": {"type": "string", "description": "search keyword"},
+                "gl": {"type": "string", "description": "geolocation (country)"},
+                "hl": {"type": "string", "description": "host language (locale)"}
             },
             "required": ["keyword"]
         }
     }
 }
 
-def googleSearch(keyword):
+
+def googleSearch(**kwargs):
     # Serper.dev APIの設定（ダミーのURLとAPIキー）
     url = "https://google.serper.dev/search"
     serper_api_key = os.getenv("SERPER_API_KEY")
 
-    payload = json.dumps({
-        "q": keyword,
-#        "gl": "jp",
-#        "hl": "ja"
-    })
+    payload = {
+        "q": kwargs.get("keyword", ""),
+    }
+
+    # 追加のパラメーターがある場合、それらをペイロードに追加
+    gl = kwargs.get("gl")
+    hl = kwargs.get("hl")
+    if gl:
+        payload["gl"] = gl
+    if hl:
+        payload["hl"] = hl
 
     headers = {
-        'X-API-KEY': 'ae3f098e5768ed8c4d79cef5d9f8d99544031fc6',
+        'X-API-KEY': serper_api_key,
         'Content-Type': 'application/json'
     }
 
     # APIリクエストを実行
-    response = requests.request("POST", url, headers=headers, data=payload)
+    response = requests.request("POST", url, headers=headers, data=json.dumps(payload))
     
     # 応答が成功した場合、結果を出力
     if response.status_code == 200:
@@ -153,15 +161,12 @@ def extractTextFromURL(url):
 client = OpenAI()
 
 instructions_template = f"""
-あなたはアニメ ドラゴンボールの孫悟空で、仲間が以下の事業方針について検討していたことを知りました。以下の議論を参考に、議論に参考になる情報を{{language}}のキーワードを用いてgoogleSearch Functionを用いて必ず検索し、みんなに教えてください。検索したとは言わずに、例えば何かしらドラゴンボールのアニメの中で展開されるシーンの中にうまく入れ込んで情報を手に入れたことを言及してください。{{country}}を必ず会話に入れてください。ドラゴンボールの世界観にそって、孫悟空のような口調で喋ってください。敬語は禁止です。
+あなたはアニメ ドラゴンボールの孫悟空で、仲間が以下の事業方針について検討していたことを知りました。いままでの議論を参考に、議論に参考になる情報を{{language}}のキーワードを用いてgoogleSearch Functionを用いて必ず検索し、みんなに教えてください。検索したとは言わずに、例えば何かしらドラゴンボールのアニメの中で展開されるシーンの中にうまく入れ込んで情報を手に入れたことを言及してください。{{country}}を必ず会話に入れてください。ドラゴンボールの世界観にそって、孫悟空のような口調で喋ってください。敬語は禁止です。
 
-Final Answerは日本語を利用し、インターネット検索に含まれていた関連URLも提示してください。マークダウンを利用してください。絵文字を必ず多用して答えてください。
+Final Answerは日本語を利用し、検索に含まれていた関連URLも提示してください。マークダウンを利用してください。絵文字を必ず多用して答えてください。
 
 # 事業方針
 動物との共生を通じて、人々の幸福を追求する新規事業
-
-# 今までの議論の履歴
-{{latest_posts_formatted}}
 
 # フォーマット
 ```
@@ -187,11 +192,10 @@ while execution_count < max_execution_count:
 
     # 直近の投稿を取得
     latest_posts = simpledcapi.get_latest_posts(topic_id, count=latest_posts_count)
-    latest_posts_formatted = simpledcapi.format_posts(latest_posts)
+    # latest_posts_formatted = simpledcapi.format_posts(latest_posts)
 
     # 最後の投稿のAgent名を取得
     latest_post = latest_posts[-1]
-    print(latest_post)
     latest_post_agent_name = latest_post["raw"].split("\n")[0] if latest_post else ""
 
     # 最後の投稿が自分かどうか確認
@@ -202,8 +206,7 @@ while execution_count < max_execution_count:
 
         instructions = instructions_template.format(
             language=selected_country["lang"],
-            country=selected_country["name"],
-            latest_posts_formatted=latest_posts_formatted,
+            country=selected_country["name"]
         )
 
         # Create an assistant for solving math problems
@@ -226,6 +229,15 @@ while execution_count < max_execution_count:
         #     content="それでは孫悟空さん、お願いします",
         # )
         # print(f"User message sent with ID: {message.id}")
+        
+        for post in latest_posts:
+            # Send a message to the thread asking for help with a math problem
+            message = client.beta.threads.messages.create(
+                thread_id=thread.id,
+                role="user",
+                content=simpledcapi.format_post(post),
+            )
+            print(f"User message sent with ID: {message.id}")
 
         # Run the assistant to address the user's math problem
         run = client.beta.threads.runs.create(
@@ -246,7 +258,8 @@ while execution_count < max_execution_count:
                 for tool_call in run.required_action.submit_tool_outputs.tool_calls:
                     # Google Searchの呼び出し
                     if tool_call.function.name == 'googleSearch':
-                        result = googleSearch(json.loads(tool_call.function.arguments)['keyword'])
+                        #result = googleSearch(json.loads(tool_call.function.arguments)['keyword'])
+                        result = googleSearch(**json.loads(tool_call.function.arguments))
                         tool_outputs.append({
                             "tool_call_id": tool_call.id,
                             "output": json.dumps(result['organic'])
