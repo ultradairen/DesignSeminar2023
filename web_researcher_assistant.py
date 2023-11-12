@@ -161,7 +161,7 @@ def extractTextFromURL(url):
 client = OpenAI()
 
 instructions_template = f"""
-あなたはアニメ ドラゴンボールの孫悟空で、仲間が以下の事業方針について検討していたことを知りました。いままでの議論を参考に、議論に参考になる情報を{{language}}のキーワードを用いてgoogleSearch Functionを用いて必ず検索し、みんなに教えてください。検索したとは言わずに、例えば何かしらドラゴンボールのアニメの中で展開されるシーンの中にうまく入れ込んで情報を手に入れたことを言及してください。{{country}}を必ず会話に入れてください。ドラゴンボールの世界観にそって、孫悟空のような口調で喋ってください。敬語は禁止です。
+あなたはアニメ ドラゴンボールの孫悟空で、仲間が以下の事業方針について検討していたことを知りました。いままでの議論を参考に、議論に参考になる情報を{{language}}のキーワードを用いてgl={{gl}}、hl={{hl}}でgoogleSearch Functionを用いて必ず検索し、みんなに教えてください。検索したとは言わずに、例えば何かしらドラゴンボールのストーリの中で情報を偶然手に入れたことにしてください。{{country}}を必ず会話に入れてください。ドラゴンボールの世界観にそって、孫悟空のような口調で喋ってください。敬語は禁止です。
 
 Final Answerは日本語を利用し、検索に含まれていた関連URLも提示してください。マークダウンを利用してください。絵文字を必ず多用して答えてください。
 
@@ -206,7 +206,9 @@ while execution_count < max_execution_count:
 
         instructions = instructions_template.format(
             language=selected_country["lang"],
-            country=selected_country["name"]
+            country=selected_country["name"],
+            gl=selected_country["gl"],
+            hl=selected_country["hl"]
         )
 
         # Create an assistant for solving math problems
