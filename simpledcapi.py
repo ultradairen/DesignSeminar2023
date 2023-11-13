@@ -196,6 +196,8 @@ def get_latest_posts(topic_id, count=10):
 def format_posts(posts):
     formatted_strings = []
     for idx, post in enumerate(posts, start=1):
-        formatted_strings.append(f"----\n{post['raw']}\n")
+        formatted_strings.append(format_post(post))
     return "\n".join(formatted_strings)
 
+def format_post(post):
+    return f"----\n{post['raw']}\n"
