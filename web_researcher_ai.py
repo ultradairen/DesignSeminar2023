@@ -1,12 +1,11 @@
 import os, time
 from dotenv import load_dotenv
 import langchain
-from langchain import OpenAI
 from langchain.agents import initialize_agent, Tool, AgentType, AgentExecutor
 from langchain.chat_models import AzureChatOpenAI
+from langchain.chat_models import ChatOpenAI
 from langchain.utilities import GoogleSerperAPIWrapper
 
-import openai
 import simpledcapi
 from langchain.tools import tool
 import logging
@@ -66,11 +65,6 @@ simpledcapi.Api_Username = os.getenv("DISCOURSE_API_USERNAME")
 category_id = os.getenv("DISCOURSE_CATEGORY_ID")
 topic_id = os.getenv("DISCOURSE_TOPIC_ID")
 
-# OpenAI
-openai.api_key = os.getenv("OPENAI_API_KEY")
-model = os.getenv("OPENAI_MODEL")
-
-
 @tool
 def search(query: str) -> str:
     """useful for when you need to answer questions about current events. You should ask targeted questions"""
@@ -81,8 +75,8 @@ def search(query: str) -> str:
 
 
 tools = [search]
-
-llm = OpenAI(temperature=1.0, streaming=False, model_name=model)
+model = os.getenv("OPENAI_MODEL")
+llm = ChatOpenAI(model=model, temperature=1.0)
 
 agent = initialize_agent(
     tools,
